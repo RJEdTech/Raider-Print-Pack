@@ -142,7 +142,9 @@
   .essay .who { font-family: "Segoe UI", Arial, sans-serif; border-bottom: 2px solid #111; padding: 8px 0 10px; margin-bottom: 14px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .essay .who b { font-size: 20px; }
   .essay .who span { font-size: 13px; color: #444; }
-  .essay .q { font-family: "Segoe UI", Arial, sans-serif; font-size: 12.5px; color: #555; margin: 18px 0 6px; line-height: 1.45; }
+  .essay .q { font-family: "Segoe UI", Arial, sans-serif; font-size: 12.5px; color: #555; margin: 26px 0 8px; padding-top: 12px; border-top: 1px solid #bbb; line-height: 1.45; }
+  .essay .who + .q { margin-top: 14px; padding-top: 0; border-top: none; }
+  .essay .q .qnum { display: block; font-size: 15px; font-weight: 700; color: #111; margin-bottom: 2px; }
   .essay .resp p { margin: 0 0 .8em; }
   .essay .resp img { max-width: 100%; }
   .essay .resp ul, .essay .resp ol { margin: 0 0 .8em 1.4em; }
@@ -292,7 +294,7 @@
   <div class="note-box">
     <b>Good to know</b>
     <ul>
-      <li>New Quizzes: only <b>essay question</b> answers are printed. Multiple choice and other question types are left out.</li>
+      <li>New Quizzes: only <b>essay question</b> answers are printed. Multiple choice and other question types are left out. If a quiz has more than one essay, each answer is labeled with its question number (Question 2, Question 5…), in quiz order, one after another under that student's name.</li>
       <li>Assignments: Word documents, PDFs, photos, and text typed into Canvas all print. Anything else (a Pages file, a Google link, a video) is listed as <b>Print by hand</b> so nobody gets missed.</li>
       <li>Pictures that students pasted inside a New Quiz essay don't come through. The writing does.</li>
       <li>Word documents are redrawn in your browser, so a font you don't have may look slightly different. The words and page order are the same.</li>
@@ -403,7 +405,7 @@ async function elementToPages(pdf, el){
 async function addEssay(pdf, s){
   const el = document.createElement("div"); el.className = "essay";
   el.innerHTML = `<div class="who"><b>${esc(s.name)}</b><span>${esc([s.section, s.submitted].filter(Boolean).join(" · "))}</span></div>` +
-    s.items.map(it => `<div class="q">${esc(it.q)}</div><div class="resp">${it.html}</div>`).join("");
+    s.items.map(it => `<div class="q"><span class="qnum">Question ${it.num}</span>${esc(it.q)}</div><div class="resp">${it.html}</div>`).join("");
   $("#stage").appendChild(el);
   try { return await elementToPages(pdf, el); } finally { el.remove(); }
 }
@@ -486,10 +488,10 @@ function studentsFromCSV(text){
   const best = new Map();
   for (const r of rows.slice(1)){
     const id = r[iID] || r[iName], att = +r[iAtt] || 1, items = [];
-    for (const tc of typeCols){
+    for (const [k, tc] of typeCols.entries()){
       if (!/essay/i.test((r[tc] || "").trim())) continue;
       const q = (rows[0][tc + 1] || "").replace(/\s+/g, " ").trim(), resp = r[tc + 1] || "";
-      items.push({ q: q.length > 180 ? q.slice(0, 177) + "…" : q, html: resp.trim() ? cleanHTML(resp) : "<p><em>No response</em></p>", blank: !resp.trim() });
+      items.push({ num: k + 1, q: q.length > 180 ? q.slice(0, 177) + "…" : q, html: resp.trim() ? cleanHTML(resp) : "<p><em>No response</em></p>", blank: !resp.trim() });
     }
     if (!items.length) continue;
     const prev = best.get(id);
