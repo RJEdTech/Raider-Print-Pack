@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raider Print Pack</title>
+<meta name="description" content="Print a whole Canvas assignment or New Quiz at once: one PDF, one student per page. Runs in your browser — student work never leaves your computer.">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#C11430">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.4.1/dist/docx-preview.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  /* ===== Theme tokens (shared with the other RJ Ed Tech tools) ===== */
+  :root {
+    --bg: #ffffff; --bg-elev: #fafafa; --bg-card: #f3f3f3; --bg-hover: #ededed;
+    --raider: #C11430; --raider-hot: #a0102a; --raider-tint: rgba(193, 20, 48, 0.08);
+    --text: #1a1a1a; --text-mute: #595959; --text-dim: #999999;
+    --border: #e5e5e5; --border-strong: #c5c5c5;
+  }
+  [data-theme="dark"] {
+    --bg: #0a0a0a; --bg-elev: #161616; --bg-card: #1c1c1c; --bg-hover: #222222;
+    --raider: #C11430; --raider-hot: #e0223f; --raider-tint: rgba(193, 20, 48, 0.15);
+    --text: #ffffff; --text-mute: #a0a0a0; --text-dim: #666666;
+    --border: #2a2a2a; --border-strong: #3a3a3a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif; font-size: 16px; line-height: 1.5; min-height: 100vh; }
+  body { display: flex; flex-direction: column; }
+  code, .mono { font-family: "IBM Plex Mono", Consolas, "Courier New", monospace; }
+  ::selection { background: var(--raider); color: #fff; }
+  :focus-visible { outline: 2px solid var(--raider); outline-offset: 2px; }
+
+  /* ===== Header ===== */
+  .site-header { border-bottom: 1px solid var(--border); padding: 1.25rem 2rem; display: flex; align-items: center; gap: 1rem; }
+  .header-left { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+  .rj-mark { height: 40px; width: auto; display: block; flex-shrink: 0; }
+  .header-text { display: flex; flex-direction: column; gap: 0.1rem; }
+  .brand { font-size: 1.35rem; font-weight: 600; letter-spacing: 0.01em; }
+  .brand .accent { color: var(--raider); }
+  .tagline { color: var(--text-mute); font-size: 0.9rem; }
+
+  main { flex: 1; max-width: 880px; width: 100%; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+  .lead { color: var(--text-mute); font-size: 1.05rem; margin-bottom: 2rem; max-width: 720px; }
+  .lead strong { color: var(--text); font-weight: 500; }
+
+  /* ===== Three-step strip ===== */
+  .workflow-label { font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mute); margin-bottom: 0.75rem; }
+  .workflow-steps { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 0.75rem; align-items: center; margin-bottom: 2.25rem; }
+  .workflow-step { display: flex; gap: 0.75rem; align-items: flex-start; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; padding: 0.85rem 1rem; height: 100%; }
+  .step-num { font-family: "IBM Plex Mono", monospace; font-weight: 600; background: var(--raider); color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem; }
+  .step-title { font-weight: 600; font-size: 0.95rem; }
+  .step-detail { color: var(--text-mute); font-size: 0.85rem; }
+  .workflow-arrow { width: 20px; height: 20px; color: var(--text-dim); }
+  @media (max-width: 720px) { .workflow-steps { grid-template-columns: 1fr; } .workflow-arrow { display: none; } }
+
+  /* ===== Section headings ===== */
+  h2.section { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.35rem; display: flex; align-items: center; gap: 0.6rem; }
+  h2.section .num { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; font-weight: 600; color: var(--raider); border: 1px solid var(--raider); border-radius: 3px; padding: 1px 7px; }
+  .section-sub { color: var(--text-mute); margin-bottom: 1.25rem; }
+  section.block { margin-bottom: 2.75rem; }
+
+  /* ===== Which kind of assignment? ===== */
+  .picker { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
+  @media (max-width: 620px) { .picker { grid-template-columns: 1fr; } }
+  .pick { text-align: left; font: inherit; color: var(--text); background: var(--bg-elev); border: 2px solid var(--border); border-radius: 6px; padding: 1rem 1.1rem; cursor: pointer; transition: border-color .15s, background .15s; }
+  .pick:hover { border-color: var(--border-strong); }
+  .pick[aria-pressed="true"] { border-color: var(--raider); background: var(--raider-tint); }
+  .pick .p-title { font-weight: 600; font-size: 1.02rem; display: flex; align-items: center; gap: 0.5rem; }
+  .pick .p-title .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border-strong); flex-shrink: 0; }
+  .pick[aria-pressed="true"] .p-title .dot { border-color: var(--raider); background: radial-gradient(var(--raider) 45%, transparent 50%); }
+  .pick .p-desc { color: var(--text-mute); font-size: 0.88rem; margin-top: 0.3rem; }
+
+  /* ===== Step list with screenshots ===== */
+  ol.howto { list-style: none; display: flex; flex-direction: column; gap: 1.5rem; counter-reset: s; }
+  ol.howto > li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 0.25rem 0.9rem; }
+  ol.howto > li::before { content: counter(s); grid-row: span 3; font-family: "IBM Plex Mono", monospace; font-weight: 600; background: var(--text); color: var(--bg); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; margin-top: 2px; }
+  .h-title { font-weight: 600; font-size: 1.02rem; }
+  .h-body { color: var(--text-mute); max-width: 640px; }
+  .h-body b { color: var(--text); font-weight: 600; }
+  figure.shot { margin-top: 0.6rem; border: 1px solid var(--border-strong); border-radius: 4px; overflow: hidden; background: #fff; max-width: 640px; }
+  figure.shot img { display: block; width: 100%; height: auto; }
+  figure.shot figcaption { font-size: 0.8rem; color: var(--text-mute); background: var(--bg-elev); border-top: 1px solid var(--border); padding: 0.45rem 0.75rem; }
+  .keys { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 6px; background: var(--bg-elev); color: var(--text); white-space: nowrap; }
+
+  /* ===== Drop zone ===== */
+  .dropzone { border: 2px dashed var(--border-strong); border-radius: 4px; padding: 2.75rem 2rem; text-align: center; background: var(--bg-elev); cursor: pointer; transition: border-color .15s, background .15s; margin-bottom: 1.1rem; }
+  .dropzone:hover, .dropzone.drag-over { border-color: var(--raider); background: var(--raider-tint); }
+  .dropzone .upload-icon { width: 40px; height: 40px; margin-bottom: 0.8rem; color: var(--text-dim); }
+  .dropzone .primary-text { font-size: 1.15rem; font-weight: 500; margin-bottom: 0.3rem; }
+  .dropzone .secondary-text { color: var(--text-mute); font-size: 0.92rem; }
+  .dropzone .browse-link { color: var(--raider); text-decoration: underline; }
+
+  .opts { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; }
+  .opts label { display: flex; gap: 0.6rem; align-items: flex-start; cursor: pointer; font-size: 0.95rem; }
+  .opts input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--raider); flex-shrink: 0; }
+  .opts small { color: var(--text-mute); }
+
+  .status { min-height: 1.5rem; color: var(--text-mute); margin-bottom: 0.75rem; font-size: 0.95rem; }
+  .status.err { color: var(--raider); font-weight: 500; }
+
+  .tablebox { overflow-x: auto; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 1.25rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.55rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-mute); font-weight: 500; background: var(--bg-elev); }
+  tr:last-child td { border-bottom: none; }
+  td.n { font-family: "IBM Plex Mono", monospace; text-align: right; }
+  .pill { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 0 8px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+  .pill.ok { color: var(--text); } .pill.skip { color: var(--text-mute); border-style: dashed; } .pill.bad { color: var(--raider); } .pill.wait { color: var(--text-dim); }
+  .empty-row td { color: var(--text-dim); text-align: center; padding: 1.25rem; }
+
+  .action-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem; }
+  .btn { background: var(--raider); color: #fff; border: none; padding: 0.8rem 1.7rem; font-size: 1rem; font-weight: 500; font-family: inherit; cursor: pointer; border-radius: 3px; display: inline-flex; align-items: center; gap: 0.5rem; }
+  .btn:hover:not(:disabled) { background: var(--raider-hot); }
+  .btn:disabled { background: var(--bg-card); color: var(--text-dim); cursor: not-allowed; }
+  .btn.secondary { background: transparent; border: 1px solid var(--border-strong); color: var(--text-mute); }
+  .btn.secondary:hover:not(:disabled) { background: transparent; border-color: var(--raider); color: var(--raider); }
+  .btn svg { width: 18px; height: 18px; }
+  .summary { color: var(--text-mute); font-size: 0.92rem; }
+  .fallback { font-size: 0.88rem; color: var(--text-mute); }
+  .fallback button { background: none; border: none; color: var(--raider); text-decoration: underline; font: inherit; cursor: pointer; padding: 0; }
+
+  .note-box { background: var(--bg-elev); border: 1px solid var(--border); border-left: 4px solid var(--text); padding: 1rem 1.25rem; border-radius: 3px; font-size: 0.93rem; color: var(--text-mute); }
+  .note-box b { color: var(--text); }
+  .note-box ul { margin: 0.4rem 0 0 1.1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+
+  .site-footer { border-top: 1px solid var(--border); padding: 1.5rem 2rem; color: var(--text-dim); font-size: 0.85rem; text-align: center; }
+  .site-footer a { color: var(--text-mute); text-decoration: none; border-bottom: 1px solid var(--border); }
+  .site-footer a:hover { color: var(--raider); border-color: var(--raider); }
+  .hidden { display: none !important; }
+
+  /* Off-screen stage: what gets photographed onto PDF pages — always black on white */
+  #stage { position: absolute; left: -12000px; top: 0; width: 816px; background: #fff; }
+  .essay { width: 816px; padding: 0 72px 24px; background: #fff; color: #111; font-family: "Source Serif 4", Georgia, "Times New Roman", serif; font-size: 16px; line-height: 1.75; }
+  .essay .who { font-family: "Segoe UI", Arial, sans-serif; border-bottom: 2px solid #111; padding: 8px 0 10px; margin-bottom: 14px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .essay .who b { font-size: 20px; }
+  .essay .who span { font-size: 13px; color: #444; }
+  .essay .q { font-family: "Segoe UI", Arial, sans-serif; font-size: 12.5px; color: #555; margin: 18px 0 6px; line-height: 1.45; }
+  .essay .resp p { margin: 0 0 .8em; }
+  .essay .resp img { max-width: 100%; }
+  .essay .resp ul, .essay .resp ol { margin: 0 0 .8em 1.4em; }
+  .essay .resp table { border-collapse: collapse; } .essay .resp td, .essay .resp th { border: 1px solid #999; padding: 4px 6px; }
+  .essay pre.plain { white-space: pre-wrap; font-family: inherit; margin: 0; }
+  .pp-docx section.docx { padding-top: 24px !important; padding-bottom: 24px !important; min-height: 0 !important; margin: 0 !important; box-shadow: none !important; }
+  .pp-docx .docx-wrapper { background: #fff !important; padding: 0 !important; }
+
+  @media (max-width: 600px) {
+    .site-header { padding: 1rem 1.25rem; }
+    main { padding: 1.75rem 1.25rem 3rem; }
+    .rj-mark { height: 34px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<!-- Light/dark follows the operating system setting, like the rest of the suite. -->
+<script>
+(function(){
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  function apply(){ document.documentElement.setAttribute("data-theme", mq.matches ? "dark" : "light"); }
+  apply();
+  if (mq.addEventListener) mq.addEventListener("change", apply); else if (mq.addListener) mq.addListener(apply);
+})();
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-left">
+    <img class="rj-mark" src="data:image/png;base64,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" alt="Regis Jesuit" />
+    <div class="header-text">
+      <div class="brand">Raider <span class="accent">Print Pack</span></div>
+      <div class="tagline">Print a whole assignment at once</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <p class="lead">
+    Turn every student's work on a Canvas assignment or New Quiz into <strong>one PDF, one student per page</strong>, so you print once instead of opening papers one by one.
+    <strong>Everything runs in your browser. Student work never leaves your computer.</strong>
+  </p>
+
+  <div class="workflow-label">How this works &mdash; three steps</div>
+  <div class="workflow-steps">
+    <div class="workflow-step"><div class="step-num">1</div><div><div class="step-title">Get the file from Canvas</div><div class="step-detail">One click in the quiz or assignment</div></div></div>
+    <svg class="workflow-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    <div class="workflow-step"><div class="step-num">2</div><div><div class="step-title">Drop it here</div><div class="step-detail">Straight from your Downloads folder</div></div></div>
+    <svg class="workflow-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    <div class="workflow-step"><div class="step-num">3</div><div><div class="step-title">Click Print</div><div class="step-detail">Everyone's work prints as one job</div></div></div>
+  </div>
+
+  <!-- ===== Step 1 ===== -->
+  <section class="block" id="step1">
+    <h2 class="section"><span class="num">STEP 1</span> Get the file from Canvas</h2>
+    <p class="section-sub">Which kind of assignment are you printing? Pick one and follow the pictures.</p>
+
+    <div class="picker" role="group" aria-label="Kind of assignment">
+      <button class="pick" id="pickQuiz" aria-pressed="true" type="button">
+        <div class="p-title"><span class="dot"></span>A New Quiz with essay questions</div>
+        <div class="p-desc">Students typed their answers in the quiz. In-class essays, short writing, exit tickets.</div>
+      </button>
+      <button class="pick" id="pickAssign" aria-pressed="false" type="button">
+        <div class="p-title"><span class="dot"></span>An assignment where students turned in files</div>
+        <div class="p-desc">Students uploaded a Word doc, PDF or photo, or typed into the assignment's text box.</div>
+      </button>
+    </div>
+
+    <ol class="howto" id="howQuiz">
+      <li>
+        <div class="h-title">Open the quiz in Canvas</div>
+        <div class="h-body">Go to your course, then <b>Quizzes</b> or <b>Assignments</b>, and click the quiz. New Quizzes have a rocket icon. The quiz opens with a row of tabs across the top: Build, Settings, Moderate, Reports, Exports.</div>
+        <figure class="shot"><img src="img/quiz-open.jpg" width="610" height="212" alt="A Canvas assignments list. A New Quiz with a rocket icon, Write: Unit 1 In-Class Essay, is circled in red."><figcaption>Click the quiz's name. The rocket icon means it's a New Quiz.</figcaption></figure>
+      </li>
+      <li>
+        <div class="h-title">Click <b>Reports</b>, then <b>Generate Report</b> under Student Analysis</div>
+        <div class="h-body">Click the <b>Reports</b> tab <span class="mono">(1)</span>. In the <b>Student Analysis</b> box, click <b>Generate Report</b> <span class="mono">(2)</span>. Wait a few seconds until the date under &ldquo;Data Last Updated&rdquo; changes to right now. That makes sure every student who has finished is included.</div>
+        <figure class="shot"><img src="img/quiz-reports.jpg" width="800" height="492" alt="The New Quizzes Reports tab. The Reports tab is circled and marked 1. In the Student Analysis box, Generate Report is circled and marked 2, and Export CSV is circled and marked 3."><figcaption>The Reports tab of a New Quiz. Ignore the other boxes.</figcaption></figure>
+      </li>
+      <li>
+        <div class="h-title">Click <b>Export CSV</b></div>
+        <div class="h-body">In the same Student Analysis box, click <b>Export CSV</b> <span class="mono">(3)</span>. A file called <code>student_analysis.csv</code> lands in your <b>Downloads</b> folder. You don't need to open it. Come back to this page.</div>
+      </li>
+    </ol>
+
+    <ol class="howto hidden" id="howAssign">
+      <li>
+        <div class="h-title">Open the assignment in Canvas</div>
+        <div class="h-body">Go to your course, then <b>Assignments</b>, and click the assignment. Make your browser window full size. On a small window, Canvas hides the menu you need.</div>
+      </li>
+      <li>
+        <div class="h-title">Click <b>Download Submissions</b> on the right</div>
+        <div class="h-body">Look for <b>Related Items</b> on the right side of the page and click <b>Download Submissions</b>.</div>
+        <figure class="shot"><img src="img/assignment-download.jpg" width="800" height="492" alt="A Canvas assignment page. On the right under Related Items, Download Submissions is circled in red."><figcaption>Download Submissions sits under Related Items, below SpeedGrader.</figcaption></figure>
+      </li>
+      <li>
+        <div class="h-title">Wait for the blue bar to fill</div>
+        <div class="h-body">Canvas gathers everyone's files into one <code>.zip</code> file. When the bar is full, it downloads on its own. If it doesn't, click <b>Click here to download</b>. Don't unzip it. Come back to this page.</div>
+        <figure class="shot"><img src="img/assignment-zip-ready.jpg" width="800" height="492" alt="The Download Assignment Submissions box with a full progress bar and the link Click here to download circled in red."><figcaption>When it says Finished, the zip is in your Downloads folder.</figcaption></figure>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ===== Step 2 ===== -->
+  <section class="block" id="step2">
+    <h2 class="section"><span class="num">STEP 2</span> Drop the file here</h2>
+    <p class="section-sub">Drag the file from your Downloads folder onto the box, or click the box and choose it.</p>
+
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose the file you downloaded from Canvas">
+      <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <div class="primary-text">Drop <code>student_analysis.csv</code> or the <code>.zip</code> here</div>
+      <div class="secondary-text">or <span class="browse-link">click to choose it</span> from Downloads</div>
+      <input id="file-input" type="file" accept=".csv,.zip,.pdf,.docx,.txt,.html,.htm,.jpg,.jpeg,.png" multiple hidden>
+    </div>
+
+    <div class="opts">
+      <label><input type="checkbox" id="optLabel" checked> <span>Put the student's name at the top of every page <small>so loose pages find their way home</small></span></label>
+      <label><input type="checkbox" id="optSection" checked> <span>Group students by class period <small>(New Quizzes only)</small></span></label>
+      <label><input type="checkbox" id="optDuplex"> <span>I'm printing double-sided <small>so each student starts on a fresh sheet</small></span></label>
+    </div>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <p class="section-sub" style="margin-bottom:.6rem">Within a few seconds every student appears in the list below, with how many pages each one will take. Check that nobody is missing. <b>Print by hand</b> means that one file needs to be printed on its own.</p>
+
+    <figure class="shot" style="margin:0 0 1rem"><img src="img/pack-list.jpg" width="1224" height="422" alt="Example of the student list after dropping a file: six students, each with an essay word count, a page count, and the status Added."><figcaption>Example: what the list looks like when it's ready (made-up names). Your real list appears in the box below.</figcaption></figure>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Student</th><th>What's printed</th><th style="text-align:right">Pages</th><th>Status</th></tr></thead>
+        <tbody id="rows"><tr class="empty-row"><td colspan="4">Your students will be listed here after you drop the file.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== Step 3 ===== -->
+  <section class="block" id="step3">
+    <h2 class="section"><span class="num">STEP 3</span> Print</h2>
+    <p class="section-sub">Click <b>Print</b>. Your printer window opens with every student's work in it. Pick your printer and click Print.</p>
+    <div class="action-row">
+      <button class="btn" id="printBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="1"/><path d="M7 14h10v7H7z"/></svg>Print</button>
+      <button class="btn secondary" id="saveBtn" disabled>Save PDF instead</button>
+      <span id="summary" class="summary"></span>
+    </div>
+    <p class="fallback hidden" id="fallback">No printer window? <button type="button" id="openBtn">Open the PDF in a new tab</button>, then press <span class="keys">Ctrl</span> + <span class="keys">P</span> (on a Mac, <span class="keys">&#8984;</span> + <span class="keys">P</span>).</p>
+    <figure class="shot" style="margin-top:1.25rem"><img src="img/printed-pages.jpg" width="1110" height="366" alt="Four printed pages: each student's essay starts on its own page with their name, class period and the question at the top, and their name repeated in small print on every page."><figcaption>What comes out of the printer: each student starts on a new page, with their name on every page.</figcaption></figure>
+  </section>
+
+  <div class="note-box">
+    <b>Good to know</b>
+    <ul>
+      <li>New Quizzes: only <b>essay question</b> answers are printed. Multiple choice and other question types are left out.</li>
+      <li>Assignments: Word documents, PDFs, photos, and text typed into Canvas all print. Anything else (a Pages file, a Google link, a video) is listed as <b>Print by hand</b> so nobody gets missed.</li>
+      <li>Pictures that students pasted inside a New Quiz essay don't come through. The writing does.</li>
+      <li>Word documents are redrawn in your browser, so a font you don't have may look slightly different. The words and page order are the same.</li>
+    </ul>
+  </div>
+</main>
+
+<div id="stage" aria-hidden="true"></div>
+
+<footer class="site-footer">
+  Built for Regis Jesuit High School &middot;
+  <a href="https://github.com/RJEdTech/Raider-Print-Pack" target="_blank" rel="noopener">View on GitHub</a>
+  &middot;
+  <a href="https://forms.microsoft.com/r/sKU9sHY45r" target="_blank" rel="noopener">Report a bug or request a tool</a>
+</footer>
+
+<script>
+(function(){
+"use strict";
+const $ = s => document.querySelector(s);
+const PW = 612, PH = 792, MARGIN = 40;   // US Letter in points
+const state = { bytes: null, url: null, name: "print-pack", busy: false };
+
+/* ---------- which-kind picker ---------- */
+function choose(kind){
+  const quiz = kind !== "assign";
+  $("#pickQuiz").setAttribute("aria-pressed", String(quiz));
+  $("#pickAssign").setAttribute("aria-pressed", String(!quiz));
+  $("#howQuiz").classList.toggle("hidden", !quiz);
+  $("#howAssign").classList.toggle("hidden", quiz);
+  try { localStorage.setItem("rpp-kind", quiz ? "quiz" : "assign"); } catch (e) {}
+}
+$("#pickQuiz").addEventListener("click", () => choose("quiz"));
+$("#pickAssign").addEventListener("click", () => choose("assign"));
+try { if (localStorage.getItem("rpp-kind") === "assign") choose("assign"); } catch (e) {}
+
+/* ---------- helpers ---------- */
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const winAnsi = s => String(s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/[^\x20-\x7E\xA0-\xFF]/g, "?");
+const ext = n => (n.match(/\.([^.\/]+)$/) || [, ""])[1].toLowerCase();
+const tick = () => new Promise(r => setTimeout(r, 0));
+function setStatus(msg, err){ const s = $("#status"); s.textContent = msg; s.classList.toggle("err", !!err); }
+
+function parseCSV(s){
+  if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < s.length; i++){
+    const c = s[i];
+    if (q){ if (c === '"'){ if (s[i+1] === '"'){ f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ","){ row.push(f); f = ""; }
+    else if (c === "\n"){ row.push(f); rows.push(row); row = []; f = ""; }
+    else if (c !== "\r") f += c;
+  }
+  if (f !== "" || row.length){ row.push(f); rows.push(row); }
+  return rows.filter(r => r.length > 1 || r[0] !== "");
+}
+
+function cleanHTML(html){
+  const doc = new DOMParser().parseFromString("<div>" + html + "</div>", "text/html");
+  doc.querySelectorAll("script,iframe,object,embed,link,meta,style,form,input,button,video,audio").forEach(n => n.remove());
+  doc.querySelectorAll("*").forEach(el => { [...el.attributes].forEach(a => {
+    const n = a.name.toLowerCase();
+    if (n.startsWith("on") || n === "srcset") el.removeAttribute(a.name);
+    if (n === "src" && !/^data:image\//i.test(a.value)) el.removeAttribute(a.name);   // Canvas-hosted images can't be fetched from here
+  }); });
+  return doc.body.firstChild.innerHTML;
+}
+const countWords = html => { const t = new DOMParser().parseFromString(html, "text/html").body.textContent.trim(); return t ? t.split(/\s+/).length : 0; };
+
+/* ---------- canvas -> PDF pages, cutting only at blank rows so no line of text is split ---------- */
+function findCut(ctx, w, lo, hi){
+  if (hi - lo < 4) return hi;
+  const data = ctx.getImageData(0, lo, w, hi - lo).data;
+  for (let r = hi - lo - 1; r >= 0; r--){
+    let blank = true; const o = r * w * 4;
+    for (let x = 0; x < w; x += 2){ const i = o + x * 4; if (data[i] < 240 || data[i+1] < 240 || data[i+2] < 240){ blank = false; break; } }
+    if (blank) return lo + r;
+  }
+  return hi;
+}
+async function canvasToPages(pdf, canvas){
+  const k = PW / canvas.width, room = (PH - 2 * MARGIN) / k;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const pages = []; let y = 0;
+  while (y < canvas.height - 2){
+    let end = Math.min(canvas.height, y + room);
+    if (end < canvas.height) end = findCut(ctx, canvas.width, Math.floor(y + room * 0.72), Math.floor(end));
+    const h = Math.max(1, Math.round(end - y));
+    const c = document.createElement("canvas"); c.width = canvas.width; c.height = h;
+    const cx = c.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, h); cx.drawImage(canvas, 0, y, c.width, h, 0, 0, c.width, h);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.88));
+    const img = await pdf.embedJpg(await blob.arrayBuffer());
+    const p = pdf.addPage([PW, PH]);
+    p.drawImage(img, { x: 0, y: PH - MARGIN - h * k, width: PW, height: h * k });
+    pages.push(p); y = end;
+  }
+  return pages;
+}
+async function elementToPages(pdf, el){
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  const scale = Math.min(2, 30000 / Math.max(1, el.scrollHeight));
+  const canvas = await html2canvas(el, { scale, backgroundColor: "#ffffff", logging: false, useCORS: false });
+  return canvasToPages(pdf, canvas);
+}
+
+/* ---------- each kind of file ---------- */
+async function addEssay(pdf, s){
+  const el = document.createElement("div"); el.className = "essay";
+  el.innerHTML = `<div class="who"><b>${esc(s.name)}</b><span>${esc([s.section, s.submitted].filter(Boolean).join(" · "))}</span></div>` +
+    s.items.map(it => `<div class="q">${esc(it.q)}</div><div class="resp">${it.html}</div>`).join("");
+  $("#stage").appendChild(el);
+  try { return await elementToPages(pdf, el); } finally { el.remove(); }
+}
+async function addText(pdf, nm, text, isHTML){
+  const el = document.createElement("div"); el.className = "essay";
+  el.innerHTML = `<div class="who"><b>${esc(nm.student)}</b><span>${esc(nm.file)}</span></div>` +
+    (isHTML ? `<div class="resp">${cleanHTML(text)}</div>` : `<pre class="plain">${esc(text)}</pre>`);
+  $("#stage").appendChild(el);
+  try { return await elementToPages(pdf, el); } finally { el.remove(); }
+}
+async function addDocx(pdf, bytes){
+  const host = document.createElement("div"); host.className = "pp-docx";
+  const styles = document.createElement("div"), body = document.createElement("div");
+  host.append(styles, body); $("#stage").appendChild(host);
+  try {
+    await docx.renderAsync(new Blob([bytes]), body, styles, { inWrapper: true, ignoreHeight: true, breakPages: true,
+      ignoreLastRenderedPageBreak: false, useBase64URL: true, renderHeaders: false, renderFooters: false, renderComments: false, renderChanges: false });
+    await tick();
+    const sections = [...body.querySelectorAll("section.docx")];
+    const pages = [];
+    for (const sec of (sections.length ? sections : [body])) pages.push(...await elementToPages(pdf, sec));
+    return pages;
+  } finally { host.remove(); }
+}
+async function addPdf(pdf, bytes){
+  const src = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+  const copied = await pdf.copyPages(src, src.getPageIndices());
+  copied.forEach(p => pdf.addPage(p)); return copied;
+}
+async function addImage(pdf, bytes, e){
+  let img;
+  if (e === "jpg" || e === "jpeg") img = await pdf.embedJpg(bytes);
+  else if (e === "png") img = await pdf.embedPng(bytes);
+  else {
+    const bmp = await createImageBitmap(new Blob([bytes]));
+    const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height; c.getContext("2d").drawImage(bmp, 0, 0);
+    img = await pdf.embedPng(await (await new Promise(r => c.toBlob(r, "image/png"))).arrayBuffer());
+  }
+  const maxW = PW - 2 * MARGIN, maxH = PH - 2 * MARGIN - 10, sc = Math.min(maxW / img.width, maxH / img.height, 1.5);
+  const p = pdf.addPage([PW, PH]);
+  p.drawImage(img, { x: (PW - img.width * sc) / 2, y: PH - MARGIN - 10 - img.height * sc, width: img.width * sc, height: img.height * sc });
+  return [p];
+}
+
+/* Canvas names zip files lastfirst[_late]_userid_submissionid_Original Name.ext */
+function canvasName(path){
+  const base = path.split("/").pop();
+  const m = base.match(/^([^_]+)_(?:late_|LATE_)?(\d+)_(\d+)_(.+)$/);
+  return m ? { student: m[1], file: m[4], key: m[1] + "_" + m[2] } : { student: base.replace(/\.[^.]+$/, ""), file: base, key: base };
+}
+
+/* ---------- results table ---------- */
+function clearRows(){ $("#rows").innerHTML = ""; }
+function addRow(student, what, pages, kind, label){
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${esc(student)}</td><td>${esc(what)}</td><td class="n">${pages == null ? "—" : pages}</td><td><span class="pill ${kind}">${esc(label)}</span></td>`;
+  $("#rows").appendChild(tr); return tr;
+}
+
+/* ---------- name label on every page + double-sided padding ---------- */
+async function finishGroup(pdf, font, pages, labelText){
+  if (!pages.length) return;
+  if ($("#optLabel").checked){
+    pages.forEach((p, i) => {
+      const { height } = p.getSize();
+      const t = winAnsi(labelText + (pages.length > 1 ? `   ·   page ${i + 1} of ${pages.length}` : ""));
+      p.drawText(t, { x: 24, y: height - 18, size: 8, font, color: PDFLib.rgb(0.35, 0.35, 0.35) });
+    });
+  }
+  if ($("#optDuplex").checked && pdf.getPageCount() % 2 === 1) pdf.addPage([PW, PH]);
+}
+
+/* ---------- New Quizzes Student Analysis CSV ---------- */
+function studentsFromCSV(text){
+  const rows = parseCSV(text); if (rows.length < 2) throw new Error("That file is empty. Go back to Reports, click Generate Report, then Export CSV again.");
+  const H = rows[0].map(h => h.trim());
+  const iName = H.indexOf("Name"), iID = H.indexOf("ID"), iSec = H.indexOf("SectionNames"), iSub = H.indexOf("Submitted"), iAtt = H.indexOf("Attempt");
+  const typeCols = H.map((h, i) => h === "ItemType" ? i : -1).filter(i => i >= 0);
+  if (iName < 0 || !typeCols.length) throw new Error("That isn't the Student Analysis file. In the quiz, click Reports, then Export CSV in the Student Analysis box.");
+  const best = new Map();
+  for (const r of rows.slice(1)){
+    const id = r[iID] || r[iName], att = +r[iAtt] || 1, items = [];
+    for (const tc of typeCols){
+      if (!/essay/i.test((r[tc] || "").trim())) continue;
+      const q = (rows[0][tc + 1] || "").replace(/\s+/g, " ").trim(), resp = r[tc + 1] || "";
+      items.push({ q: q.length > 180 ? q.slice(0, 177) + "…" : q, html: resp.trim() ? cleanHTML(resp) : "<p><em>No response</em></p>", blank: !resp.trim() });
+    }
+    if (!items.length) continue;
+    const prev = best.get(id);
+    if (!prev || att >= prev.att) best.set(id, { id, att, name: r[iName] || "(no name)", section: iSec >= 0 ? r[iSec] : "",
+      submitted: iSub >= 0 ? (r[iSub] || "").replace(/ UTC$/, "").slice(0, 16) : "", items });
+  }
+  const list = [...best.values()];
+  const last = n => { const p = n.trim().split(/\s+/); return (p[p.length - 1] + " " + p.slice(0, -1).join(" ")).toLowerCase(); };
+  list.sort((a, b) => ($("#optSection").checked ? a.section.localeCompare(b.section) : 0) || last(a.name).localeCompare(last(b.name)));
+  return list;
+}
+async function buildFromCSV(file){
+  const list = studentsFromCSV(await file.text());
+  if (!list.length) throw new Error("This quiz has no essay answers to print. Print Pack prints essay questions only.");
+  const pdf = await PDFLib.PDFDocument.create(), font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
+  clearRows(); let n = 0;
+  for (const s of list){
+    n++; setStatus(`Laying out ${n} of ${list.length}: ${s.name}…`);
+    const tr = addRow(s.name, "", null, "wait", "Working");
+    try {
+      const pages = await addEssay(pdf, s);
+      await finishGroup(pdf, font, pages, s.name + (s.section ? "  ·  " + s.section : ""));
+      const w = s.items.reduce((t, it) => t + (it.blank ? 0 : countWords(it.html)), 0);
+      const what = w ? `${s.items.length > 1 ? s.items.length + " essay answers" : "Essay answer"} · ${w} words` : "No answer written";
+      tr.replaceWith(addRow(s.name, what, pages.length, w ? "ok" : "skip", w ? "Added" : "Blank page added"));
+    } catch (e) { console.error(e); tr.replaceWith(addRow(s.name, "Essay answer", null, "bad", "Couldn't lay out")); }
+  }
+  return pdf;
+}
+
+/* ---------- Download Submissions zip (or loose files) ---------- */
+const OK_TYPES = ["pdf", "docx", "txt", "html", "htm", "jpg", "jpeg", "png", "gif", "webp", "bmp"];
+async function entriesFrom(files){
+  const out = [];
+  for (const f of files){
+    if (ext(f.name) === "zip"){
+      const zip = await JSZip.loadAsync(f);
+      for (const e of Object.values(zip.files)){
+        if (e.dir || /(^|\/)(__MACOSX|\.DS_Store)/.test(e.name) || /(^|\/)\._/.test(e.name)) continue;
+        out.push({ path: e.name, read: () => e.async("uint8array") });
+      }
+    } else out.push({ path: f.name, read: async () => new Uint8Array(await f.arrayBuffer()) });
+  }
+  return out.sort((a, b) => a.path.split("/").pop().localeCompare(b.path.split("/").pop()));
+}
+async function buildFromFiles(files){
+  const entries = await entriesFrom(files);
+  if (!entries.length) throw new Error("That zip is empty. Nobody has turned anything in yet?");
+  const pdf = await PDFLib.PDFDocument.create(), font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
+  clearRows();
+  let group = null, i = 0;
+  const flush = async () => { if (group){ await finishGroup(pdf, font, group.pages, group.student); group = null; } };
+  for (const e of entries){
+    i++; const nm = canvasName(e.path), x = ext(nm.file);
+    setStatus(`Adding ${i} of ${entries.length}: ${nm.file}…`);
+    if (!OK_TYPES.includes(x)){ addRow(nm.student, nm.file, null, "skip", "Print by hand"); continue; }
+    if (!group || group.key !== nm.key){ await flush(); group = { key: nm.key, student: nm.student, pages: [] }; }
+    const tr = addRow(nm.student, nm.file, null, "wait", "Working");
+    try {
+      const bytes = await e.read(); let pages;
+      if (x === "pdf") pages = await addPdf(pdf, bytes);
+      else if (x === "docx") pages = await addDocx(pdf, bytes);
+      else if (x === "txt") pages = await addText(pdf, nm, new TextDecoder().decode(bytes), false);
+      else if (x === "html" || x === "htm") pages = await addText(pdf, nm, new TextDecoder().decode(bytes), true);
+      else pages = await addImage(pdf, bytes, x);
+      group.pages.push(...pages);
+      tr.replaceWith(addRow(nm.student, nm.file, pages.length, "ok", "Added"));
+    } catch (err) { console.error(err); tr.replaceWith(addRow(nm.student, nm.file, null, "bad", "Couldn't open — print by hand")); }
+  }
+  await flush();
+  return pdf;
+}
+
+/* ---------- run ---------- */
+async function handle(files){
+  if (state.busy || !files.length) return;
+  if (typeof PDFLib === "undefined" || typeof JSZip === "undefined" || typeof html2canvas === "undefined" || typeof docx === "undefined"){
+    setStatus("The page didn't finish loading. Refresh it and try again. If it keeps happening, your network may be blocking a needed file.", true); return;
+  }
+  state.busy = true; $("#printBtn").disabled = true; $("#saveBtn").disabled = true; $("#fallback").classList.add("hidden"); $("#summary").textContent = "";
+  if (state.url){ URL.revokeObjectURL(state.url); state.url = null; }
+  const first = files[0]; state.name = first.name.replace(/\.[^.]+$/, "") || "print-pack";
+  try {
+    const isCSV = files.length === 1 && ext(first.name) === "csv";
+    const pdf = isCSV ? await buildFromCSV(first) : await buildFromFiles(files);
+    if (pdf.getPageCount() === 0) throw new Error("Nothing in that file could be printed.");
+    state.bytes = await pdf.save();
+    state.url = URL.createObjectURL(new Blob([state.bytes], { type: "application/pdf" }));
+    const n = pdf.getPageCount();
+    setStatus("Ready. Go to Step 3 and click Print.");
+    $("#summary").textContent = `${n} page${n === 1 ? "" : "s"} ready to print.`;
+    $("#printBtn").disabled = false; $("#saveBtn").disabled = false;
+    $("#step3").scrollIntoView({ behavior: "smooth", block: "center" });
+  } catch (e) { console.error(e); setStatus(e.message || "Something went wrong reading that file.", true); }
+  finally { state.busy = false; }
+}
+
+function openPdf(){ if (state.url) window.open(state.url, "_blank", "noopener"); }
+$("#printBtn").addEventListener("click", () => {
+  if (!state.url) return;
+  $("#fallback").classList.remove("hidden");
+  let f = document.getElementById("printFrame"); if (f) f.remove();
+  f = document.createElement("iframe"); f.id = "printFrame";
+  f.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0";
+  f.onload = () => { setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { openPdf(); } }, 300); };
+  f.src = state.url; document.body.appendChild(f);
+});
+$("#openBtn").addEventListener("click", openPdf);
+$("#saveBtn").addEventListener("click", () => {
+  if (!state.url) return;
+  const a = document.createElement("a"); a.href = state.url; a.download = `${state.name} - print.pdf`;
+  document.body.appendChild(a); a.click(); a.remove();
+});
+
+const dz = $("#dropzone"), input = $("#file-input");
+dz.addEventListener("click", () => input.click());
+dz.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); input.click(); } });
+input.addEventListener("change", () => { handle([...input.files]); input.value = ""; });
+["dragenter", "dragover"].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); dz.classList.add("drag-over"); }));
+["dragleave", "drop"].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); dz.classList.remove("drag-over"); }));
+dz.addEventListener("drop", e => handle([...e.dataTransfer.files]));
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => { e.preventDefault(); if (!dz.contains(e.target)) handle([...e.dataTransfer.files]); });
+window.__rpp = { handle, state };   // test hook
+})();
+</script>
+
+<!--RJTOOLS-->
+<section class="rj-tools" aria-label="More RJ Ed Tech tools">
+<style>
+.rj-tools{max-width:1000px;margin:52px auto 0;padding:30px 20px 44px;border-top:1px solid rgba(128,128,128,.28);font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;box-sizing:border-box;}
+.rj-tools *{box-sizing:border-box;}
+.rj-tools h2{font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#C11430;margin:0 0 16px;}
+.rj-tools-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:10px;}
+.rj-tool{display:block;padding:13px 15px;border:1px solid rgba(128,128,128,.28);border-radius:8px;text-decoration:none;color:inherit;background:rgba(128,128,128,.05);transition:border-color .15s,transform .15s;}
+.rj-tool:hover{border-color:#C11430;transform:translateY(-1px);}
+.rj-tool .rj-t{font-weight:650;font-size:.95rem;display:flex;align-items:center;gap:6px;color:inherit;line-height:1.25;}
+.rj-tool .rj-arrow{color:#C11430;transition:transform .15s;font-weight:700;}
+.rj-tool:hover .rj-arrow{transform:translateX(3px);}
+.rj-tool .rj-d{font-size:.8rem;line-height:1.42;margin-top:5px;opacity:.72;}
+.rj-tool.is-here{border-color:#C11430;background:rgba(193,20,48,.10);cursor:default;}
+.rj-tool.is-here:hover{transform:none;}
+.rj-here{margin-left:auto;font-size:.6rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#C11430;border:1px solid #C11430;border-radius:99px;padding:2px 8px;white-space:nowrap;}
+.rj-tools-foot{margin-top:18px;font-size:.72rem;opacity:.55;}
+</style>
+  <h2>More RJ Ed Tech tools</h2>
+  <div class="rj-tools-grid">
+    <div class="rj-tool is-here"><div class="rj-t">Raider Print Pack<span class="rj-here">You&rsquo;re here</span></div><div class="rj-d">Print a whole assignment or New Quiz at once, one student per page.</div></div>
+    <a class="rj-tool" href="https://rjedtech.github.io/Raider-Quiz-Builder/"><div class="rj-t">Raider Quiz Builder <span class="rj-arrow">&rarr;</span></div><div class="rj-d">Build, expand, and convert Canvas quizzes from plain text.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/Raider-Randomizer/"><div class="rj-t">Raider Randomizer <span class="rj-arrow">&rarr;</span></div><div class="rj-d">Fair student picking, grouping, and seating shuffles.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/Raider-Timer/"><div class="rj-t">Raider Timer <span class="rj-arrow">&rarr;</span></div><div class="rj-d">Countdown, stopwatch, and station rotation for class.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/Raider-Pods/"><div class="rj-t">Raider Pod Generator <span class="rj-arrow">&rarr;</span></div><div class="rj-d">Mixed teams of four, seated so partners can actually help each other.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/Raider-Roster-Hub/"><div class="rj-t">Raider Roster Hub <span class="rj-arrow">&rarr;</span></div><div class="rj-d">One class list for all your RJ tools, and ZipGrade without student names.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/MyRJScheduleCleaner/"><div class="rj-t">MyRJ Schedule Cleaner <span class="rj-arrow">&rarr;</span></div><div class="rj-d">Import your MyRJ schedule into Outlook without looking busy all day.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/cooperative-learning-toolkit/"><div class="rj-t">Cooperative Learning Toolkit <span class="rj-arrow">&rarr;</span></div><div class="rj-d">Every Kagan structure, method, and source in one place.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/Raider-Teclado/"><div class="rj-t">Raider Teclado <span class="rj-arrow">&rarr;</span></div><div class="rj-d">Type Spanish accents, ñ, ¿ and ¡ on a US keyboard.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/Raider-Clavier/"><div class="rj-t">Raider Clavier <span class="rj-arrow">&rarr;</span></div><div class="rj-d">Type French accents on a US keyboard, AZERTY or US-International.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/Raider-Observation-Digest/"><div class="rj-t">Raider Observation Digest <span class="rj-arrow">&rarr;</span></div><div class="rj-d">Your observation report, cut down to what was actually scored and written.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/Raider-Observation-Console/"><div class="rj-t">Raider Observation Console <span class="rj-arrow">&rarr;</span></div><div class="rj-d">For chairs: the observation form showing only the elements you came to watch.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/EdTech-Status/"><div class="rj-t">EdTech Status <span class="rj-arrow">&rarr;</span></div><div class="rj-d">Live status of Regis Jesuit's ed-tech systems.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/Incoming-Raider-FAQ/"><div class="rj-t">Incoming Raider FAQ <span class="rj-arrow">&rarr;</span></div><div class="rj-d">A searchable guide for new and incoming Regis Jesuit students.</div></a>
+    <a class="rj-tool" href="https://rjedtech.github.io/New-Ignatian-Educator-FAQ/"><div class="rj-t">New Ignatian Educator FAQ <span class="rj-arrow">&rarr;</span></div><div class="rj-d">A searchable onboarding guide for teachers new to Ignatian education.</div></a>
+  </div>
+  <div class="rj-tools-foot">Regis Jesuit &middot; Educational Technology &mdash; free classroom tools that run in your browser</div>
+</section>
+<!--/RJTOOLS-->
+
+<!-- Anonymous page-view count (GoatCounter): no cookies, no personal data, no file contents. -->
+<script data-goatcounter="https://rjedtech.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
