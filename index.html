@@ -386,7 +386,7 @@ async function canvasToPages(pdf, canvas){
     const h = Math.max(1, Math.round(end - y));
     const c = document.createElement("canvas"); c.width = canvas.width; c.height = h;
     const cx = c.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, h); cx.drawImage(canvas, 0, y, c.width, h, 0, 0, c.width, h);
-    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.88));
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.8));
     const img = await pdf.embedJpg(await blob.arrayBuffer());
     const p = pdf.addPage([PW, PH]);
     p.drawImage(img, { x: 0, y: PH - MARGIN - h * k, width: PW, height: h * k });
@@ -396,7 +396,7 @@ async function canvasToPages(pdf, canvas){
 }
 async function elementToPages(pdf, el){
   if (document.fonts && document.fonts.ready) await document.fonts.ready;
-  const scale = Math.min(2, 30000 / Math.max(1, el.scrollHeight));
+  const scale = Math.min(1.6, 30000 / Math.max(1, el.scrollHeight));
   const canvas = await html2canvas(el, { scale, backgroundColor: "#ffffff", logging: false, useCORS: false });
   return canvasToPages(pdf, canvas);
 }
@@ -491,7 +491,7 @@ function studentsFromCSV(text){
     for (const [k, tc] of typeCols.entries()){
       if (!/essay/i.test((r[tc] || "").trim())) continue;
       const q = (rows[0][tc + 1] || "").replace(/\s+/g, " ").trim(), resp = r[tc + 1] || "";
-      items.push({ num: k + 1, q: q.length > 180 ? q.slice(0, 177) + "…" : q, html: resp.trim() ? cleanHTML(resp) : "<p><em>No response</em></p>", blank: !resp.trim() });
+      items.push({ num: k + 1, q: q.length > 180 ? q.slice(0, 177) + "…" : q, html: resp.trim() ? cleanHTML(resp) : "<p><em>(No answer written)</em></p>", blank: !resp.trim() });
     }
     if (!items.length) continue;
     const prev = best.get(id);
@@ -506,17 +506,20 @@ function studentsFromCSV(text){
 async function buildFromCSV(file){
   const list = studentsFromCSV(await file.text());
   if (!list.length) throw new Error("This quiz has no essay answers to print. Print Pack prints essay questions only.");
+  if (list.every(st => st.items.every(it => it.blank))) throw new Error("Nobody has written an essay answer on this quiz yet.");
   const pdf = await PDFLib.PDFDocument.create(), font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
   clearRows(); let n = 0;
   for (const s of list){
     n++; setStatus(`Laying out ${n} of ${list.length}: ${s.name}…`);
+    if (s.items.every(it => it.blank)){ addRow(s.name, "No essay answers written", null, "skip", "Nothing written — not printed"); continue; }
     const tr = addRow(s.name, "", null, "wait", "Working");
     try {
       const pages = await addEssay(pdf, s);
       await finishGroup(pdf, font, pages, s.name + (s.section ? "  ·  " + s.section : ""));
       const w = s.items.reduce((t, it) => t + (it.blank ? 0 : countWords(it.html)), 0);
-      const what = w ? `${s.items.length > 1 ? s.items.length + " essay answers" : "Essay answer"} · ${w} words` : "No answer written";
-      tr.replaceWith(addRow(s.name, what, pages.length, w ? "ok" : "skip", w ? "Added" : "Blank page added"));
+      const blanks = s.items.filter(it => it.blank).length;
+      const what = `${s.items.length > 1 ? s.items.length + " essay answers" : "Essay answer"} · ${w} words` + (blanks ? ` · ${blanks} left blank` : "");
+      tr.replaceWith(addRow(s.name, what, pages.length, "ok", "Added"));
     } catch (e) { console.error(e); tr.replaceWith(addRow(s.name, "Essay answer", null, "bad", "Couldn't lay out")); }
   }
   return pdf;
