@@ -22,13 +22,13 @@
   :root {
     --bg: #ffffff; --bg-elev: #fafafa; --bg-card: #f3f3f3; --bg-hover: #ededed;
     --raider: #C11430; --raider-hot: #a0102a; --raider-tint: rgba(193, 20, 48, 0.08);
-    --text: #1a1a1a; --text-mute: #595959; --text-dim: #999999;
+    --text: #1a1a1a; --text-mute: #595959; --text-dim: #6c6c6c;
     --border: #e5e5e5; --border-strong: #c5c5c5;
   }
   [data-theme="dark"] {
     --bg: #15161a; --bg-elev: #1d1f24; --bg-card: #22242a; --bg-hover: #282a30;
     --raider: #C11430; --raider-hot: #e0223f; --raider-tint: rgba(193, 20, 48, 0.15);
-    --text: #ffffff; --text-mute: #a0a0a0; --text-dim: #666666;
+    --text: #ffffff; --text-mute: #a0a0a0; --text-dim: #8c8c8c;
     --border: #2e3036; --border-strong: #3a3a3a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -194,6 +194,20 @@ body.fs .rj-masthead::before{display:none}
 @media(max-width:600px){.rj-masthead .brand,.rj-masthead h1{font-size:17px!important}.rj-masthead>label{flex-basis:100%}}
 @media print{.rj-masthead::before{display:none}.rj-masthead,.rj-masthead .brand,.rj-masthead h1{color:#000!important;-webkit-text-fill-color:#000!important}}
 /*/RJMASTHEAD*/
+
+/*RJCONTRAST*/
+/* Readability: text colours lifted to WCAG AA contrast (4.5:1) in each theme */
+:where([data-theme="light"]) .empty-row td{color:#6c6c6c}
+:where([data-theme="light"]) .btn:disabled{color:#666666}
+:where([data-theme="light"]) .site-footer{color:#6c6c6c}
+:where([data-theme="dark"]) h2.section .num{color:#ed516a}
+:where([data-theme="dark"]) .dropzone .browse-link{color:#ee5e76}
+:where([data-theme="dark"]) .empty-row td{color:#888888}
+:where([data-theme="dark"]) .btn:disabled{color:#949494}
+:where([data-theme="dark"]) .site-footer{color:#888888}
+[data-theme="dark"] .rj-tools h2{color:#ed516a}
+[data-theme="dark"] .rj-here{color:#ee5870}
+/*/RJCONTRAST*/
 </style>
 <!-- Light/dark follows the operating system setting, like the rest of the suite. -->
 <script>
