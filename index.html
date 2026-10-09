@@ -102,6 +102,11 @@
   .opts label { display: flex; gap: 0.6rem; align-items: flex-start; cursor: pointer; font-size: 16px; }
   .opts input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--raider); flex-shrink: 0; }
   .opts small { color: var(--text-mute); }
+  .opts .anon-opt { border: 1px solid var(--border); border-left: 4px solid var(--raider); border-radius: 3px; padding: 0.6rem 0.8rem; background: var(--bg-elev); }
+  .key-box { margin: 1rem 0 0; border: 1px solid var(--border); border-left: 4px solid var(--raider); border-radius: 3px; padding: 0.9rem 1.1rem; background: var(--bg-elev); }
+  .key-box p { margin: 0 0 0.7rem; color: var(--text-mute); }
+  .key-box p b { color: var(--text); }
+  .key-box .action-row { margin-bottom: 0; }
 
   .status { min-height: 1.5rem; color: var(--text-mute); margin-bottom: 0.75rem; font-size: 16px; }
   .status.err { color: var(--raider); font-weight: 500; }
@@ -314,7 +319,8 @@ body.fs .rj-masthead::before{display:none}
     </div>
 
     <div class="opts">
-      <label><input type="checkbox" id="optLabel" checked> <span>Put the student's name at the top of every page <small>so loose pages find their way home</small></span></label>
+      <label class="anon-opt"><input type="checkbox" id="optAnon"> <span><b>Grade anonymously</b> <small>Each student gets a random paper number instead of a name, and the papers print in number order. A separate <b>name key</b> matches numbers to students.</small></span></label>
+      <label><input type="checkbox" id="optLabel" checked> <span>Put the student's name (or paper number) at the top of every page <small>so loose pages find their way home</small></span></label>
       <label><input type="checkbox" id="optSection" checked> <span>Group students by class period <small>(New Quizzes only)</small></span></label>
       <label><input type="checkbox" id="optDuplex"> <span>I'm printing double-sided <small>so each student starts on a fresh sheet</small></span></label>
     </div>
@@ -340,6 +346,13 @@ body.fs .rj-masthead::before{display:none}
       <button class="btn secondary" id="saveBtn" disabled>Save PDF instead</button>
       <span id="summary" class="summary"></span>
     </div>
+    <div class="key-box hidden" id="keyBox">
+      <p><b>Name key: keep it separate from the papers.</b> It lists every paper number with the student's name, so you can record grades when you're done. Print it on its own, or save it.</p>
+      <div class="action-row">
+        <button class="btn secondary" id="keyPrintBtn" type="button">Print name key</button>
+        <button class="btn secondary" id="keySaveBtn" type="button">Save name key</button>
+      </div>
+    </div>
     <p class="fallback hidden" id="fallback">No printer window? <button type="button" id="openBtn">Open the PDF in a new tab</button>, then press <span class="keys">Ctrl</span> + <span class="keys">P</span> (on a Mac, <span class="keys">&#8984;</span> + <span class="keys">P</span>).</p>
     <figure class="shot" style="margin-top:1.25rem"><img src="img/printed-pages.jpg" width="1110" height="366" alt="Four printed pages: each student's essay starts on its own page with their name, class period and the question at the top, and their name repeated in small print on every page."><figcaption>What comes out of the printer: each student starts on a new page, with their name on every page.</figcaption></figure>
   </section>
@@ -350,6 +363,7 @@ body.fs .rj-masthead::before{display:none}
       <li>New Quizzes: only <b>essay question</b> answers are printed. Multiple choice and other question types are left out. If a quiz has more than one essay, each answer is labeled with its question number (Question 2, Question 5…), in quiz order, one after another under that student's name.</li>
       <li>Assignments: Word documents, PDFs, photos, and text typed into Canvas all print. Anything else (a Pages file, a Google link, a video) is listed as <b>Print by hand</b> so nobody gets missed.</li>
       <li>Pictures that students pasted inside a New Quiz essay don't come through. The writing does.</li>
+      <li><b>Grading anonymously:</b> Print Pack replaces the names it adds (the heading and the label on every page) with paper numbers. It can't remove a name a student typed into their own work, like the first line of a Word document. Ask students to leave their names off, or flip through before you hand papers out.</li>
       <li>Word documents are redrawn in your browser, so a font you don't have may look slightly different. The words and page order are the same.</li>
     </ul>
   </div>
@@ -369,7 +383,16 @@ body.fs .rj-masthead::before{display:none}
 "use strict";
 const $ = s => document.querySelector(s);
 const PW = 612, PH = 792, MARGIN = 40;   // US Letter in points
-const state = { bytes: null, url: null, name: "print-pack", busy: false };
+const state = { bytes: null, url: null, name: "print-pack", busy: false, files: null, key: [], keyUrl: null };
+const anon = () => $("#optAnon").checked;
+/* Random, unique paper numbers so the printed order says nothing about the class list */
+function makeCodes(n){
+  const lo = n > 700 ? 1000 : 100, span = n > 700 ? 9000 : 900, used = new Set(), out = [];
+  const buf = new Uint32Array(1);
+  while (out.length < n){ crypto.getRandomValues(buf); const c = lo + (buf[0] % span); if (!used.has(c)){ used.add(c); out.push(c); } }
+  return out;
+}
+const paper = c => `Paper ${c}`;
 
 /* ---------- which-kind picker ---------- */
 function choose(kind){
@@ -386,7 +409,8 @@ try { if (localStorage.getItem("rpp-kind") === "assign") choose("assign"); } cat
 
 /* ---------- helpers ---------- */
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-const winAnsi = s => String(s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/[^\x20-\x7E\xA0-\xFF]/g, "?");
+const winAnsi = s => String(s).replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, "-")
+  .replace(/[^\x20-\x7E\xA0-\xFF]/g, c => { const b = c.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); return /^[\x20-\x7E\xA0-\xFF]+$/.test(b) ? b : ({ "\u0141": "L", "\u0142": "l", "\u0110": "D", "\u0111": "d", "\u00df": "ss" }[c] || "?"); });
 const ext = n => (n.match(/\.([^.\/]+)$/) || [, ""])[1].toLowerCase();
 const tick = () => new Promise(r => setTimeout(r, 0));
 function setStatus(msg, err){ const s = $("#status"); s.textContent = msg; s.classList.toggle("err", !!err); }
@@ -457,14 +481,15 @@ async function elementToPages(pdf, el){
 /* ---------- each kind of file ---------- */
 async function addEssay(pdf, s){
   const el = document.createElement("div"); el.className = "essay";
-  el.innerHTML = `<div class="who"><b>${esc(s.name)}</b><span>${esc([s.section, s.submitted].filter(Boolean).join(" · "))}</span></div>` +
+  const who = s.code ? paper(s.code) : s.name, meta = s.code ? [s.section] : [s.section, s.submitted];
+  el.innerHTML = `<div class="who"><b>${esc(who)}</b><span>${esc(meta.filter(Boolean).join(" · "))}</span></div>` +
     s.items.map(it => `<div class="q"><span class="qnum">Question ${it.num}</span>${esc(it.q)}</div><div class="resp">${it.html}</div>`).join("");
   $("#stage").appendChild(el);
   try { return await elementToPages(pdf, el); } finally { el.remove(); }
 }
 async function addText(pdf, nm, text, isHTML){
   const el = document.createElement("div"); el.className = "essay";
-  el.innerHTML = `<div class="who"><b>${esc(nm.student)}</b><span>${esc(nm.file)}</span></div>` +
+  el.innerHTML = `<div class="who"><b>${esc(nm.code ? paper(nm.code) : nm.student)}</b><span>${esc(nm.code ? "" : nm.file)}</span></div>` +
     (isHTML ? `<div class="resp">${cleanHTML(text)}</div>` : `<pre class="plain">${esc(text)}</pre>`);
   $("#stage").appendChild(el);
   try { return await elementToPages(pdf, el); } finally { el.remove(); }
@@ -554,6 +579,10 @@ function studentsFromCSV(text){
   const list = [...best.values()];
   const last = n => { const p = n.trim().split(/\s+/); return (p[p.length - 1] + " " + p.slice(0, -1).join(" ")).toLowerCase(); };
   list.sort((a, b) => ($("#optSection").checked ? a.section.localeCompare(b.section) : 0) || last(a.name).localeCompare(last(b.name)));
+  if (anon()){
+    const codes = makeCodes(list.length); list.forEach((s, i) => { s.code = codes[i]; });
+    list.sort((a, b) => ($("#optSection").checked ? a.section.localeCompare(b.section) : 0) || a.code - b.code);
+  }
   return list;
 }
 async function buildFromCSV(file){
@@ -564,16 +593,18 @@ async function buildFromCSV(file){
   clearRows(); let n = 0;
   for (const s of list){
     n++; setStatus(`Laying out ${n} of ${list.length}: ${s.name}…`);
-    if (s.items.every(it => it.blank)){ addRow(s.name, "No essay answers written", null, "skip", "Nothing written — not printed"); continue; }
-    const tr = addRow(s.name, "", null, "wait", "Working");
+    const shown = s.code ? `${paper(s.code)} · ${s.name}` : s.name;
+    if (s.items.every(it => it.blank)){ addRow(shown, "No essay answers written", null, "skip", "Nothing written — not printed"); if (s.code) state.key.push({ code: s.code, name: s.name, section: s.section, note: "Nothing written — not printed" }); continue; }
+    const tr = addRow(shown, "", null, "wait", "Working");
     try {
       const pages = await addEssay(pdf, s);
-      await finishGroup(pdf, font, pages, s.name + (s.section ? "  ·  " + s.section : ""));
+      await finishGroup(pdf, font, pages, (s.code ? paper(s.code) : s.name) + (s.section ? "  ·  " + s.section : ""));
+      if (s.code) state.key.push({ code: s.code, name: s.name, section: s.section, note: "" });
       const w = s.items.reduce((t, it) => t + (it.blank ? 0 : countWords(it.html)), 0);
       const blanks = s.items.filter(it => it.blank).length;
       const what = `${s.items.length > 1 ? s.items.length + " essay answers" : "Essay answer"} · ${w} words` + (blanks ? ` · ${blanks} left blank` : "");
-      tr.replaceWith(addRow(s.name, what, pages.length, "ok", "Added"));
-    } catch (e) { console.error(e); tr.replaceWith(addRow(s.name, "Essay answer", null, "bad", "Couldn't lay out")); }
+      tr.replaceWith(addRow(shown, what, pages.length, "ok", "Added"));
+    } catch (e) { console.error(e); tr.replaceWith(addRow(shown, "Essay answer", null, "bad", "Couldn't lay out")); }
   }
   return pdf;
 }
@@ -598,14 +629,22 @@ async function buildFromFiles(files){
   if (!entries.length) throw new Error("That zip is empty. Nobody has turned anything in yet?");
   const pdf = await PDFLib.PDFDocument.create(), font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
   clearRows();
+  if (anon()){
+    // one paper number per student, then print in number order
+    const keys = [...new Set(entries.map(e => canvasName(e.path).key))], codes = makeCodes(keys.length), byKey = new Map(keys.map((k, i) => [k, codes[i]]));
+    entries.forEach(e => { e.nm = canvasName(e.path); e.nm.code = byKey.get(e.nm.key); });
+    entries.sort((a, b) => a.nm.code - b.nm.code || a.path.localeCompare(b.path));
+    keys.forEach(k => { const nm = entries.find(e => e.nm.key === k).nm; state.key.push({ code: nm.code, name: nm.student, section: "", note: "" }); });
+  }
   let group = null, i = 0;
   const flush = async () => { if (group){ await finishGroup(pdf, font, group.pages, group.student); group = null; } };
   for (const e of entries){
-    i++; const nm = canvasName(e.path), x = ext(nm.file);
+    i++; const nm = e.nm || canvasName(e.path), x = ext(nm.file);
+    const shown = nm.code ? `${paper(nm.code)} · ${nm.student}` : nm.student;
     setStatus(`Adding ${i} of ${entries.length}: ${nm.file}…`);
-    if (!OK_TYPES.includes(x)){ addRow(nm.student, nm.file, null, "skip", "Print by hand"); continue; }
-    if (!group || group.key !== nm.key){ await flush(); group = { key: nm.key, student: nm.student, pages: [] }; }
-    const tr = addRow(nm.student, nm.file, null, "wait", "Working");
+    if (!OK_TYPES.includes(x)){ addRow(shown, nm.file, null, "skip", "Print by hand"); if (nm.code){ const k = state.key.find(r => r.code === nm.code); if (k) k.note = "Has a file to print by hand: " + nm.file; } continue; }
+    if (!group || group.key !== nm.key){ await flush(); group = { key: nm.key, student: nm.code ? paper(nm.code) : nm.student, pages: [] }; }
+    const tr = addRow(shown, nm.file, null, "wait", "Working");
     try {
       const bytes = await e.read(); let pages;
       if (x === "pdf") pages = await addPdf(pdf, bytes);
@@ -614,11 +653,44 @@ async function buildFromFiles(files){
       else if (x === "html" || x === "htm") pages = await addText(pdf, nm, new TextDecoder().decode(bytes), true);
       else pages = await addImage(pdf, bytes, x);
       group.pages.push(...pages);
-      tr.replaceWith(addRow(nm.student, nm.file, pages.length, "ok", "Added"));
-    } catch (err) { console.error(err); tr.replaceWith(addRow(nm.student, nm.file, null, "bad", "Couldn't open — print by hand")); }
+      tr.replaceWith(addRow(shown, nm.file, pages.length, "ok", "Added"));
+    } catch (err) { console.error(err); tr.replaceWith(addRow(shown, nm.file, null, "bad", "Couldn't open — print by hand")); }
   }
   await flush();
   return pdf;
+}
+
+/* ---------- name key: a separate PDF, sorted by paper number and again by name ---------- */
+async function buildKeyPdf(rows, title){
+  const pdf = await PDFLib.PDFDocument.create();
+  const reg = await pdf.embedFont(PDFLib.StandardFonts.Helvetica), bold = await pdf.embedFont(PDFLib.StandardFonts.HelveticaBold);
+  const ink = PDFLib.rgb(0.1, 0.1, 0.1), mute = PDFLib.rgb(0.38, 0.38, 0.38), rule = PDFLib.rgb(0.75, 0.75, 0.75);
+  let page, y;
+  const newPage = () => { page = pdf.addPage([PW, PH]); y = PH - 54; };
+  const text = (t, x, size, f, color) => page.drawText(winAnsi(t), { x, y, size, font: f, color: color || ink });
+  const need = h => { if (y - h < 54) newPage(); };
+  newPage();
+  text("NAME KEY", 54, 9, bold, PDFLib.rgb(0.76, 0.08, 0.19)); y -= 22;
+  text(title, 54, 18, bold); y -= 18;
+  text("Keep this page separate from the papers. It matches each paper number to a student.", 54, 10, reg, mute); y -= 30;
+  const table = (heading, list, cols) => {
+    need(60); text(heading, 54, 12, bold); y -= 8;
+    page.drawLine({ start: { x: 54, y }, end: { x: PW - 54, y }, thickness: 1, color: rule }); y -= 16;
+    for (const r of list){
+      need(18);
+      cols.forEach(([x, get, f]) => text(String(get(r) || ""), x, 10.5, f || reg, f === "mute" ? mute : ink));
+      y -= 17;
+    }
+    y -= 18;
+  };
+  const byCode = [...rows].sort((a, b) => a.code - b.code);
+  const last = n => { const p = n.trim().split(/\s+/); return (p[p.length - 1] + " " + p.slice(0, -1).join(" ")).toLowerCase(); };
+  const byName = [...rows].sort((a, b) => last(a.name).localeCompare(last(b.name)));
+  const noteCol = r => [r.section, r.note].filter(Boolean).join(" · ");
+  table("By paper number", byCode, [[54, r => paper(r.code), bold], [150, r => r.name], [360, noteCol]]);
+  table("By student name", byName, [[54, r => r.name], [260, r => paper(r.code), bold], [360, noteCol]]);
+  pdf.getPages().forEach((p, i, all) => p.drawText(winAnsi(`Name key  ·  page ${i + 1} of ${all.length}`), { x: 54, y: 30, size: 8, font: reg, color: mute }));
+  return pdf.save();
 }
 
 /* ---------- run ---------- */
@@ -629,6 +701,8 @@ async function handle(files){
   }
   state.busy = true; $("#printBtn").disabled = true; $("#saveBtn").disabled = true; $("#fallback").classList.add("hidden"); $("#summary").textContent = "";
   if (state.url){ URL.revokeObjectURL(state.url); state.url = null; }
+  if (state.keyUrl){ URL.revokeObjectURL(state.keyUrl); state.keyUrl = null; }
+  state.key = []; state.files = files; $("#keyBox").classList.add("hidden");
   const first = files[0]; state.name = first.name.replace(/\.[^.]+$/, "") || "print-pack";
   try {
     const isCSV = files.length === 1 && ext(first.name) === "csv";
@@ -640,26 +714,44 @@ async function handle(files){
     setStatus("Ready. Go to Step 3 and click Print.");
     $("#summary").textContent = `${n} page${n === 1 ? "" : "s"} ready to print.`;
     $("#printBtn").disabled = false; $("#saveBtn").disabled = false;
+    if (anon() && state.key.length){
+      const kb = await buildKeyPdf(state.key, state.name);
+      state.keyUrl = URL.createObjectURL(new Blob([kb], { type: "application/pdf" }));
+      $("#keyBox").classList.remove("hidden");
+      $("#summary").textContent += ` ${state.key.length} paper number${state.key.length === 1 ? "" : "s"} in the name key.`;
+    }
     $("#step3").scrollIntoView({ behavior: "smooth", block: "center" });
   } catch (e) { console.error(e); setStatus(e.message || "Something went wrong reading that file.", true); }
   finally { state.busy = false; }
 }
 
 function openPdf(){ if (state.url) window.open(state.url, "_blank", "noopener"); }
-$("#printBtn").addEventListener("click", () => {
-  if (!state.url) return;
-  $("#fallback").classList.remove("hidden");
+function printUrl(url){
   let f = document.getElementById("printFrame"); if (f) f.remove();
   f = document.createElement("iframe"); f.id = "printFrame";
   f.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0";
-  f.onload = () => { setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { openPdf(); } }, 300); };
-  f.src = state.url; document.body.appendChild(f);
+  f.onload = () => { setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { window.open(url, "_blank", "noopener"); } }, 300); };
+  f.src = url; document.body.appendChild(f);
+}
+function saveUrl(url, filename){
+  const a = document.createElement("a"); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+$("#printBtn").addEventListener("click", () => {
+  if (!state.url) return;
+  $("#fallback").classList.remove("hidden");
+  printUrl(state.url);
 });
+$("#keyPrintBtn").addEventListener("click", () => { if (state.keyUrl) printUrl(state.keyUrl); });
+$("#keySaveBtn").addEventListener("click", () => { if (state.keyUrl) saveUrl(state.keyUrl, `${state.name} - name key.pdf`); });
+/* Changing an option after a file is loaded rebuilds with the new setting, so nobody prints a stale version */
+document.querySelectorAll(".opts input").forEach(cb => cb.addEventListener("change", () => {
+  if (state.files && !state.busy){ setStatus("Option changed. Rebuilding…"); handle(state.files); }
+}));
 $("#openBtn").addEventListener("click", openPdf);
 $("#saveBtn").addEventListener("click", () => {
   if (!state.url) return;
-  const a = document.createElement("a"); a.href = state.url; a.download = `${state.name} - print.pdf`;
-  document.body.appendChild(a); a.click(); a.remove();
+  saveUrl(state.url, `${state.name} - ${anon() ? "anonymous print" : "print"}.pdf`);
 });
 
 const dz = $("#dropzone"), input = $("#file-input");
