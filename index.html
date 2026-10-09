@@ -110,6 +110,8 @@
   .why { list-style: none; margin: 0 0 1.6rem; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.7rem; }
   .why li { border: 1px solid var(--border); border-left: 4px solid var(--raider); border-radius: 3px; padding: 0.75rem 0.95rem; background: var(--bg-elev); color: var(--text-mute); }
   .why li b { display: block; color: var(--text); margin-bottom: 0.2rem; }
+  .duplex-tip { margin: 0 0 1rem; border: 1px solid var(--border); border-left: 4px solid var(--raider); border-radius: 3px; padding: 0.7rem 0.95rem; background: var(--bg-elev); color: var(--text-mute); }
+  .duplex-tip b { color: var(--text); }
 
   .status { min-height: 1.5rem; color: var(--text-mute); margin-bottom: 0.75rem; font-size: 16px; }
   .status.err { color: var(--raider); font-weight: 500; }
@@ -327,9 +329,9 @@ body.fs .rj-masthead::before{display:none}
 
     <div class="opts">
       <label class="anon-opt"><input type="checkbox" id="optAnon"> <span><b>Grade anonymously</b> <small>Each student gets a random paper number instead of a name, and the papers print in number order. A separate <b>name key</b> matches numbers to students.</small></span></label>
+      <label><input type="checkbox" id="optDuplex" checked> <span><b>Print double-sided</b> <small>On unless you uncheck it. Each student starts on a fresh sheet, so nobody's work prints on the back of someone else's. Uncheck for single-sided.</small></span></label>
       <label><input type="checkbox" id="optLabel" checked> <span>Put the student's name (or paper number) at the top of every page <small>so loose pages find their way home</small></span></label>
       <label><input type="checkbox" id="optSection" checked> <span>Group students by class period <small>(New Quizzes only)</small></span></label>
-      <label><input type="checkbox" id="optDuplex"> <span>I'm printing double-sided <small>so each student starts on a fresh sheet</small></span></label>
     </div>
 
     <div id="status" class="status" role="status" aria-live="polite"></div>
@@ -348,6 +350,7 @@ body.fs .rj-masthead::before{display:none}
   <section class="block" id="step3">
     <h2 class="section"><span class="num">STEP 3</span> Print</h2>
     <p class="section-sub">Click <b>Print</b>. Your printer window opens with every student's work in it. Pick your printer and click Print.</p>
+    <p class="duplex-tip" id="duplexTip"><b>Double-sided is on.</b> In the printer window, make sure <b>Two-sided</b> (sometimes called <b>Print on both sides</b>) is turned on. In Chrome it's under <b>More settings</b>. Want single-sided? Uncheck <b>Print double-sided</b> in Step 2 first, so there are no blank backs.</p>
     <div class="action-row">
       <button class="btn" id="printBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="1"/><path d="M7 14h10v7H7z"/></svg>Print</button>
       <button class="btn secondary" id="saveBtn" disabled>Save PDF instead</button>
@@ -370,6 +373,7 @@ body.fs .rj-masthead::before{display:none}
       <li>New Quizzes: only <b>essay question</b> answers are printed. Multiple choice and other question types are left out. If a quiz has more than one essay, each answer is labeled with its question number (Question 2, Question 5…), in quiz order, one after another under that student's name.</li>
       <li>Assignments: Word documents, PDFs, photos, and text typed into Canvas all print. Anything else (a Pages file, a Google link, a video) is listed as <b>Print by hand</b> so nobody gets missed.</li>
       <li>Pictures that students pasted inside a New Quiz essay don't come through. The writing does.</li>
+      <li><b>Double-sided:</b> when a student's work ends on the front of a sheet, the back is left blank so the next student starts fresh. That's why you may see a few blank pages in the printer window.</li>
       <li><b>Grading anonymously:</b> Print Pack replaces the names it adds (the heading and the label on every page) with paper numbers. It can't remove a name a student typed into their own work, like the first line of a Word document. Ask students to leave their names off, or flip through before you hand papers out.</li>
       <li>Word documents are redrawn in your browser, so a font you don't have may look slightly different. The words and page order are the same.</li>
     </ul>
@@ -392,6 +396,7 @@ const $ = s => document.querySelector(s);
 const PW = 612, PH = 792, MARGIN = 40;   // US Letter in points
 const state = { bytes: null, url: null, name: "print-pack", busy: false, files: null, key: [], keyUrl: null };
 const anon = () => $("#optAnon").checked;
+const duplex = () => $("#optDuplex").checked;
 /* Random, unique paper numbers so the printed order says nothing about the class list */
 function makeCodes(n){
   const lo = n > 700 ? 1000 : 100, span = n > 700 ? 9000 : 900, used = new Set(), out = [];
@@ -560,7 +565,7 @@ async function finishGroup(pdf, font, pages, labelText){
       p.drawText(t, { x: 24, y: height - 18, size: 8, font, color: PDFLib.rgb(0.35, 0.35, 0.35) });
     });
   }
-  if ($("#optDuplex").checked && pdf.getPageCount() % 2 === 1) pdf.addPage([PW, PH]);
+  if ($("#optDuplex").checked && pdf.getPageCount() % 2 === 1){ pdf.addPage([PW, PH]); state.blanks++; }
 }
 
 /* ---------- New Quizzes Student Analysis CSV ---------- */
@@ -709,17 +714,21 @@ async function handle(files){
   state.busy = true; $("#printBtn").disabled = true; $("#saveBtn").disabled = true; $("#fallback").classList.add("hidden"); $("#summary").textContent = "";
   if (state.url){ URL.revokeObjectURL(state.url); state.url = null; }
   if (state.keyUrl){ URL.revokeObjectURL(state.keyUrl); state.keyUrl = null; }
-  state.key = []; state.files = files; $("#keyBox").classList.add("hidden");
+  state.key = []; state.files = files; state.blanks = 0; $("#keyBox").classList.add("hidden");
   const first = files[0]; state.name = first.name.replace(/\.[^.]+$/, "") || "print-pack";
   try {
     const isCSV = files.length === 1 && ext(first.name) === "csv";
     const pdf = isCSV ? await buildFromCSV(first) : await buildFromFiles(files);
     if (pdf.getPageCount() === 0) throw new Error("Nothing in that file could be printed.");
+    // tell the printer window which way to print (Chrome and Edge preselect Two-sided from this)
+    pdf.catalog.getOrCreateViewerPreferences().setDuplex(duplex() ? PDFLib.Duplex.DuplexFlipLongEdge : PDFLib.Duplex.Simplex);
     state.bytes = await pdf.save();
     state.url = URL.createObjectURL(new Blob([state.bytes], { type: "application/pdf" }));
     const n = pdf.getPageCount();
     setStatus("Ready. Go to Step 3 and click Print.");
-    $("#summary").textContent = `${n} page${n === 1 ? "" : "s"} ready to print.`;
+    $("#summary").textContent = duplex()
+      ? `${n} pages on ${Math.ceil(n / 2)} sheets, double-sided.` + (state.blanks ? ` ${state.blanks} blank back${state.blanks === 1 ? "" : "s"} so each student starts a new sheet.` : "")
+      : `${n} page${n === 1 ? "" : "s"} ready to print, single-sided.`;
     $("#printBtn").disabled = false; $("#saveBtn").disabled = false;
     if (anon() && state.key.length){
       const kb = await buildKeyPdf(state.key, state.name);
@@ -751,6 +760,9 @@ $("#printBtn").addEventListener("click", () => {
 });
 $("#keyPrintBtn").addEventListener("click", () => { if (state.keyUrl) printUrl(state.keyUrl); });
 $("#keySaveBtn").addEventListener("click", () => { if (state.keyUrl) saveUrl(state.keyUrl, `${state.name} - name key.pdf`); });
+/* The Step 3 reminder follows the double-sided setting */
+const syncDuplexTip = () => $("#duplexTip").classList.toggle("hidden", !duplex());
+$("#optDuplex").addEventListener("change", syncDuplexTip); syncDuplexTip();
 /* Changing an option after a file is loaded rebuilds with the new setting, so nobody prints a stale version */
 document.querySelectorAll(".opts input").forEach(cb => cb.addEventListener("change", () => {
   if (state.files && !state.busy){ setStatus("Option changed. Rebuilding…"); handle(state.files); }
