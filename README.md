@@ -34,3 +34,7 @@ Long answers are cut into pages only at blank rows of pixels, so no line of text
 ## Screenshots
 
 The step-by-step screenshots come from a real RJ Canvas course with student names cropped out. Retake them if Canvas moves the buttons.
+
+## License
+
+© 2026 Jason Beyer, RJ Ed Tech. Licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/): free to share and adapt for non-commercial use with credit. See [LICENSE](LICENSE) for what the license does not cover.
